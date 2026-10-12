@@ -59,8 +59,15 @@ export const POST = async (request: Request) => {
         }
 
         const createdOrder = await OrderModel.create({
-            ...payload,
             userId: decoded.id,
+            foodItemsIds: payload.foodItemsIds,
+            deliveryBoyId: payload.deliveryBoyId,
+            restoId: payload.restoId,
+            amount: payload.amount,
+            address: payload.address,
+            city: payload.city,
+            landmark: payload.landmark,
+            paymentMethod: payload.paymentMethod || "COD",
         });
 
         return NextResponse.json({ message: "Created successfully", status: true, data: createdOrder }, { status: 200, statusText: "Created successfully" });
@@ -107,6 +114,8 @@ export const GET = async (request: Request) => {
                     restaurant,
                     amount: order.amount,
                     status: order.status,
+                    paymentMethod: order.paymentMethod,
+                    paymentStatus: order.paymentStatus,
                     city: order.city,
                     address: order.address,
                     landmark: order.landmark,

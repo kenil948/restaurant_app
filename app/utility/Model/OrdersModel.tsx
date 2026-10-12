@@ -8,8 +8,8 @@ const OrderSchema = new Schema({
         required: true,
     },
     foodItemsIds: [{
-        type: String,
-        ref: "foods"
+        type: Schema.Types.ObjectId,
+        ref: "foodItems"
     }],
     restoId: {
         type: Schema.Types.ObjectId,
@@ -32,8 +32,27 @@ const OrderSchema = new Schema({
         default: "Pending"
     },
     amount: {
-        type: String,
+        type: Number,
         required: true
+    },
+    paymentMethod: {
+        type: String,
+        enum: ["COD", "Razorpay"],
+        default: "COD"
+    },
+    paymentStatus: {
+        type: String,
+        enum: [
+            "Pending",
+            "Paid",
+            "Failed",
+            "Refunded"
+        ],
+        default: "Pending"
+    },
+    transactionId: {
+        type: String,
+        default: null
     },
     address: {
         type: String,

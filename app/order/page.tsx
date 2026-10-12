@@ -20,7 +20,7 @@ const CheckoutPage = () => {
 
     const [user, setUser] = useState<any>(null);
     const [cartStorage, setCartStorage] = useState<FoodItemType[]>([]);
-
+    const [paymentMethod, setPaymentMethod] = useState<"COD" | "Razorpay">("COD");
     const [city, setCity] = useState("");
     const [address, setAddress] = useState("");
     const [landmark, setLandmark] = useState("");
@@ -78,6 +78,36 @@ const CheckoutPage = () => {
         );
     }
 
+    const foodItemsIds = cartStorage.map(item => item._id);
+    const createOrder = async (deliveryBoyId: string) => {
+
+        const orderData = {
+            foodItemsIds,
+            restoId: cartStorage[0].restaurantId,
+            deliveryBoyId,
+            status: "Pending",
+            amount: totalAmount,
+            city,
+            address,
+            landmark,
+            paymentMethod,
+            paymentStatus:
+                paymentMethod === "Razorpay"
+                    ? "Paid"
+                    : "Pending",
+        };
+
+        const response = await fetchWithAuth("/api/order", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(orderData),
+        });
+
+        return await response.json();
+    };
+
 
     const handlePlaceOrder = async () => {
 
@@ -87,6 +117,7 @@ const CheckoutPage = () => {
         setLoading(true);
         if (!city || !address) {
             toast.error("Please enter delivery details.");
+            setLoading(false);
             return;
         }
 
@@ -127,7 +158,6 @@ const CheckoutPage = () => {
                 toast.error("Cart is empty");
                 return;
             }
-            const foodItemsIds = cartStorage.map(item => item._id);
             const deliveryBoyResponse = await fetch(`/api/deliverypartner/${city}`);
             const deliveryBoyIds = await deliveryBoyResponse.json();
             const deliveryBoy_Id = deliveryBoyIds.data.map((item: any) => item._id);
@@ -137,35 +167,36 @@ const CheckoutPage = () => {
                 return;
             }
 
-            const orderData = {
-                foodItemsIds,
-                restoId: cartStorage[0].restaurantId,
-                deliveryBoyId,
-                status: "Pending",
-                amount: totalAmount.toString(),
-                city,
-                address,
-                landmark,
-            };
-            const response = await fetchWithAuth("/api/order", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(orderData),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                toast.error(data.message || "Failed to place order");
+            if (paymentMethod === "COD") {
+                const data = await createOrder(deliveryBoyId);
+                if (!data.status) {
+                    toast.error(data.message || "Failed to place order");
+                    return;
+                }
+                localStorage.removeItem("cart");
+                toast.success("Order placed successfully!");
+                router.push("/payment/success/" + data.data._id);
                 return;
             }
+            if (paymentMethod === "Razorpay") {
+                localStorage.setItem(
+                    "pendingOrder",
+                    JSON.stringify({
+                        userId: user._id,
+                        foodItemsIds,
+                        restoId: cartStorage[0].restaurantId,
+                        deliveryBoyId,
+                        amount: totalAmount,
+                        city,
+                        address,
+                        landmark,
+                        paymentMethod,
+                    })
+                );
 
-            localStorage.removeItem("cart");
-            toast.success("Order placed successfully!");
-            router.push("/myprofile");
-
+                router.push("/payment");
+                return;
+            }
         } catch (error) {
             console.log(error);
             toast.error("Something went wrong");
@@ -293,17 +324,86 @@ const CheckoutPage = () => {
                                     Payment Method
                                 </h2>
 
-                                <div className="p-5 border border-zinc-200 rounded-2xl bg-green-50">
-                                    <p className="font-semibold text-zinc-900">
-                                        Cash On Delivery
-                                    </p>
+                                <div className="space-y-4">
 
-                                    <p className="text-sm text-zinc-500 mt-1">
-                                        You will pay when your order is delivered.
-                                    </p>
+                                    {/* COD */}
+                                    <label
+                                        className={`flex items-start gap-4 p-5 rounded-2xl border cursor-pointer transition-all ${paymentMethod === "COD"
+                                            ? "border-orange-500 bg-orange-50"
+                                            : "border-zinc-200 hover:border-orange-300"
+                                            }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="payment"
+                                            value="COD"
+                                            checked={paymentMethod === "COD"}
+                                            onChange={() => setPaymentMethod("COD")}
+                                            className="hidden"
+                                        />
+
+                                        <div
+                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-1 ${paymentMethod === "COD"
+                                                ? "border-orange-500"
+                                                : "border-zinc-300"
+                                                }`}
+                                        >
+                                            {paymentMethod === "COD" && (
+                                                <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="font-semibold text-zinc-900">
+                                                Cash On Delivery
+                                            </p>
+
+                                            <p className="text-sm text-zinc-500 mt-1">
+                                                You will pay when your order is delivered.
+                                            </p>
+                                        </div>
+                                    </label>
+
+                                    {/* Razorpay */}
+                                    <label
+                                        className={`flex items-start gap-4 p-5 rounded-2xl border cursor-pointer transition-all ${paymentMethod === "Razorpay"
+                                            ? "border-orange-500 bg-orange-50"
+                                            : "border-zinc-200 hover:border-orange-300"
+                                            }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="payment"
+                                            value="Razorpay"
+                                            checked={paymentMethod === "Razorpay"}
+                                            onChange={() => setPaymentMethod("Razorpay")}
+                                            className="hidden"
+                                        />
+
+                                        <div
+                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-1 ${paymentMethod === "Razorpay"
+                                                ? "border-orange-500"
+                                                : "border-zinc-300"
+                                                }`}
+                                        >
+                                            {paymentMethod === "Razorpay" && (
+                                                <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="font-semibold text-zinc-900">
+                                                Razorpay
+                                            </p>
+
+                                            <p className="text-sm text-zinc-500 mt-1">
+                                                Pay using UPI, Cards, Net Banking and Wallets.
+                                            </p>
+                                        </div>
+                                    </label>
+
                                 </div>
                             </div>
-
                         </div>
 
                         <div>

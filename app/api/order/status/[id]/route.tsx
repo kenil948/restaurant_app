@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { connectDB } from "@/app/utility/db";
 import { sessionModel } from "@/app/utility/Model/session.model";
+import { randomUUID } from "node:crypto";
+import { sendOrderStatusWebhook } from "@/app/utility/sendwebhook";
 
 connectDB();
 
@@ -83,6 +85,19 @@ export const PATCH = async (request: Request, { params }: Props) => {
 
         const { status } = await request.json();
 
+        if (
+            status !== "Picked Up" &&
+            status !== "Delivered"
+        ) {
+            return NextResponse.json(
+                {
+                    message: "Invalid order status",
+                    status: false,
+                },
+                { status: 400 }
+            );
+        }
+
         if (!status) {
             return NextResponse.json(
                 {
@@ -149,18 +164,50 @@ export const PATCH = async (request: Request, { params }: Props) => {
             );
         }
 
+        const previousStatus = order.status;
+
         order.status = status;
+        if (
+            status === "Delivered" &&
+            order.paymentMethod === "COD"
+        ) {
+            order.paymentStatus = "Paid";
+        }
         await order.save();
+
+        // Create a unique event for this status change.
+        const event = {
+            id: randomUUID(),
+            event: "order.status_updated" as const,
+            createdAt: new Date().toISOString(),
+            data: {
+                orderId: order._id.toString(),
+                previousStatus,
+                newStatus: order.status,
+            },
+        };
+
+        let webhookResult;
+
+        try {
+            webhookResult = await sendOrderStatusWebhook(event);
+        } catch (error) {
+            console.error("Webhook delivery failed:", error);
+
+            webhookResult = {
+                success: false,
+                message: "Order updated, but webhook delivery failed",
+            };
+        }
 
         return NextResponse.json(
             {
                 message: "Updated successfully",
                 status: true,
                 data: order,
+                webhook: webhookResult,
             },
-            {
-                status: 200,
-            }
+            { status: 200 }
         );
     } catch (error) {
         console.log(error);
