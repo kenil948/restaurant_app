@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import CustomerHeader from "../_components/CustomerHeader";
 import RestaurantFooter from "../_components/RestaurantFooter";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "../helper/fetchWithAuth";
+import toast from "react-hot-toast";
+import { FiArrowLeft } from "react-icons/fi";
 
 type FoodItemType = {
     _id: string;
@@ -19,16 +21,28 @@ type FoodItemType = {
 
 const Cart = () => {
 
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
+    const [cartStorage, setCartStorage] = useState<FoodItemType[]>([]);
     const router = useRouter();
 
     const handleCheckout = async () => {
-        const res = await fetchWithAuth("/api/user/me")
+        if (checkoutLoading) return;
 
-        if (res.ok) {
-            router.push("/order")
-        }
-        else {
-            router.push("/user-auth?mode=login&redirect=true");
+        setCheckoutLoading(true);
+
+        try {
+            const res = await fetchWithAuth("/api/user/me");
+
+            if (res.ok) {
+                router.push("/order");
+            } else {
+                router.push("/user-auth?mode=login&redirect=true");
+            }
+        } catch (error) {
+            console.error("Checkout error:", error);
+            toast.error("Something went wrong. Please try again.");
+        } finally {
+            setCheckoutLoading(false);
         }
     };
 
@@ -39,12 +53,13 @@ const Cart = () => {
 
         localStorage.setItem("cart", JSON.stringify(updatedCart));
 
-        window.location.reload();
+        setCartStorage(updatedCart);
     };
 
-    const [cartStorage] = useState<FoodItemType[]>(
-        JSON.parse(localStorage.getItem("cart") || "[]")
-    );
+    useEffect(() => {
+        const storedCart = localStorage.getItem("cart");
+        setCartStorage(storedCart ? JSON.parse(storedCart) : []);
+    }, []);
 
     const totalAmount = useMemo(() => {
         return cartStorage.reduce((acc, item) => acc + item.price, 0);
@@ -62,8 +77,29 @@ const Cart = () => {
             <section className="bg-white border-b border-zinc-200">
                 <div className="max-w-7xl mx-auto p-6">
 
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const cart: FoodItemType[] = JSON.parse(
+                                localStorage.getItem("cart") || "[]"
+                            );
 
+                            const restaurantId = cart[0]?.restaurantId;
+
+                            if (!restaurantId) {
+                                router.push("/");
+                                return;
+                            }
+
+                            router.push(`/explore/restaurant?id=${restaurantId}`);
+                        }}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 mb-3 bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                    >
+                        <FiArrowLeft className="w-4 h-4" />
+                        Continue Shopping
+                    </button>
+
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div>
                             <h1 className="text-4xl font-bold text-zinc-900">
                                 Shopping Cart
@@ -219,9 +255,10 @@ const Cart = () => {
 
                                         <button
                                             onClick={handleCheckout}
-                                            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-semibold text-lg transition cursor-pointer"
+                                            disabled={checkoutLoading}
+                                            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-semibold text-lg transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                                         >
-                                            Proceed To Checkout
+                                            {checkoutLoading ? "Checking..." : "Proceed To Checkout"}
                                         </button>
 
                                     </div>

@@ -25,6 +25,7 @@ const PaymentSuccessPage = ({
 
     const [order, setOrder] = useState<OrderType | null>(null);
     const [loading, setLoading] = useState(true);
+    const [countdown, setCountdown] = useState(5);
 
     useEffect(() => {
         const getOrder = async () => {
@@ -51,13 +52,18 @@ const PaymentSuccessPage = ({
     }, [params]);
 
     useEffect(() => {
+        const interval = setInterval(() => {
+            setCountdown((prev) => prev - 1);
+        }, 1000);
 
         const timer = setTimeout(() => {
             router.push("/myprofile");
-        }, 10000);
+        }, 5000);
 
-        return () => clearTimeout(timer);
-
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timer);
+        };
     }, [router]);
 
     if (loading) {
@@ -178,13 +184,12 @@ const PaymentSuccessPage = ({
                     </p>
 
                     <p
-                        className={`font-semibold mt-1 ${
-                            order.status === "Pending"
-                                ? "text-orange-500"
-                                : order.status === "Delivered"
+                        className={`font-semibold mt-1 ${order.status === "Pending"
+                            ? "text-orange-500"
+                            : order.status === "Delivered"
                                 ? "text-green-600"
                                 : "text-blue-500"
-                        }`}
+                            }`}
                     >
                         {order.status}
                     </p>
@@ -225,7 +230,7 @@ const PaymentSuccessPage = ({
                 </div>
 
                 <p className="text-center text-sm text-zinc-400 mt-5">
-                    Redirecting to My Orders in 10 seconds...
+                    Redirecting to My Orders in {countdown} seconds...
                 </p>
 
                 <div className="mt-8 flex flex-col gap-3">

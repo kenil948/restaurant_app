@@ -14,6 +14,7 @@ const UpdateFoodItem = () => {
     const [imageUrl, setImageUrl] = useState("");
     const [description, setDescription] = useState("");
     const [error, setError] = useState(false)
+    const [updating, setUpdating] = useState(false);
     const router = useRouter();
 
     const fetchFoodData = async () => {
@@ -41,35 +42,53 @@ const UpdateFoodItem = () => {
     const handleSubmit = async (
         e: React.FormEvent<HTMLFormElement>
     ) => {
-
         e.preventDefault();
 
-        if (!foodName || !price || !imageUrl || !description) {
+        if (updating) return;
+
+        if (
+            !foodName.trim() ||
+            !price ||
+            !imageUrl.trim() ||
+            !description.trim()
+        ) {
             setError(true);
             return;
-        } else {
-            setError(false)
         }
 
-        const response = await fetch(`/api/restaurant/foods/edit/${id}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                foodName,
-                price,
-                imageUrl,
-                description,
-            })
-        })
-        const data = await response.json();
+        setError(false);
+        setUpdating(true);
 
-        if (response.ok) {
-            toast.success(data.message || "Food item updated");
-            router.push("/restaurant/dashboard");
-        } else {
-            toast.error(data.message || "Food item not updated");
+        try {
+            const response = await fetch(
+                `/api/restaurant/foods/edit/${id}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        foodName,
+                        price,
+                        imageUrl,
+                        description,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                toast.success(data.message || "Food item updated");
+                router.push("/restaurant/dashboard");
+            } else {
+                toast.error(data.message || "Food item not updated");
+            }
+        } catch (error) {
+            console.error("Update food item error:", error);
+            toast.error("Something went wrong. Please try again.");
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -187,15 +206,17 @@ const UpdateFoodItem = () => {
                     <div className="flex gap-4 pt-2">
                         <button
                             type="submit"
-                            className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-all cursor-pointer"
+                            disabled={updating}
+                            className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                         >
-                            Update Food Item
+                            {updating ? "Updating..." : "Update Food Item"}
                         </button>
 
                         <button
                             type="button"
+                            disabled={updating}
                             onClick={() => router.back()}
-                            className="flex-1 py-3 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl font-semibold transition-all cursor-pointer"
+                            className="flex-1 py-3 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl font-semibold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             Cancel
                         </button>

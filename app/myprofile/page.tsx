@@ -5,6 +5,7 @@ import CustomerHeader from "../_components/CustomerHeader";
 import RestaurantFooter from "../_components/RestaurantFooter";
 import { fetchWithAuth } from "../helper/fetchWithAuth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type OrderType = {
     orderId: string;
@@ -13,6 +14,8 @@ type OrderType = {
     city: string;
     address: string;
     landmark: string;
+    paymentMethod: string;
+    paymentStatus: string;
     restaurant: {
         restaurantName: string;
         city: string;
@@ -62,19 +65,19 @@ const MyProfile = () => {
     };
 
     useEffect(() => {
-    const loadData = async () => {
-        try {
-            await Promise.all([
-                getCurrentUser(),
-                getMyOrders()
-            ]);
-        } finally {
-            setLoading(false);
-        }
-    };
+        const loadData = async () => {
+            try {
+                await Promise.all([
+                    getCurrentUser(),
+                    getMyOrders()
+                ]);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    loadData();
-}, []);
+        loadData();
+    }, []);
 
     if (loading || !user) {
         return (
@@ -175,57 +178,57 @@ const MyProfile = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-5">
-
                                     {myOrders.map((order) => {
                                         const shortId = order.orderId.slice(-4);
 
                                         return (
-                                            <div
+                                            <Link
                                                 key={order.orderId}
-                                                className="border border-zinc-200 rounded-2xl p-5 hover:shadow-md transition"
+                                                href={`/myprofile/order-details/${order.orderId}`}
+                                                className="group block border border-zinc-200 rounded-2xl p-5 bg-white hover:border-orange-300 hover:shadow-lg transition-all duration-200 cursor-pointer"
                                             >
-
-                                                <div className="flex items-start justify-between">
-
-                                                    <div>
-                                                        <h3 className="text-lg font-semibold">
-                                                            {
-                                                                order.restaurant
-                                                                    .restaurantName
-                                                            }
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="min-w-0">
+                                                        <h3 className="text-lg font-semibold text-zinc-900 group-hover:text-orange-600 transition-colors">
+                                                            {order.restaurant.restaurantName}
                                                         </h3>
 
-                                                        <p className="text-sm text-zinc-500">
-                                                            {
-                                                                order.restaurant
-                                                                    .city
-                                                            }
+                                                        <p className="text-sm text-zinc-500 mt-1">
+                                                            {order.restaurant.city}
                                                         </p>
                                                     </div>
 
                                                     <span
-                                                        className={`px-4 py-1 rounded-full text-sm font-medium
-                                                        ${order.status === "Pending"
-                                                                ? "bg-yellow-100 text-yellow-700"
-                                                                : order.status === "Delivered"
-                                                                    ? "bg-green-100 text-green-700"
-                                                                    : order.status === "Cancelled"
-                                                                        ? "bg-red-100 text-red-700"
-                                                                        : "bg-blue-100 text-blue-700"
+                                                        className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${order.paymentMethod === "Razorpay" &&
+                                                                order.paymentStatus !== "Paid"
+                                                                ? order.paymentStatus === "Failed"
+                                                                    ? "bg-red-100 text-red-700"
+                                                                    : "bg-amber-100 text-amber-700"
+                                                                : order.status === "Pending"
+                                                                    ? "bg-yellow-100 text-yellow-700"
+                                                                    : order.status === "Delivered"
+                                                                        ? "bg-green-100 text-green-700"
+                                                                        : order.status === "Cancelled"
+                                                                            ? "bg-red-100 text-red-700"
+                                                                            : "bg-blue-100 text-blue-700"
                                                             }`}
                                                     >
-                                                        {order.status}
+                                                        {order.paymentMethod === "Razorpay" &&
+                                                            order.paymentStatus !== "Paid"
+                                                            ? order.paymentStatus === "Failed"
+                                                                ? "Payment Failed"
+                                                                : "Awaiting Payment"
+                                                            : order.status}
                                                     </span>
                                                 </div>
 
-                                                <div className="mt-4 grid sm:grid-cols-2 gap-4">
-
+                                                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     <div>
                                                         <p className="text-sm text-zinc-500">
                                                             Amount
                                                         </p>
 
-                                                        <p className="text-2xl font-semibold text-orange-500">
+                                                        <p className="text-2xl font-bold text-orange-500 mt-1">
                                                             ₹{order.amount}
                                                         </p>
                                                     </div>
@@ -235,20 +238,24 @@ const MyProfile = () => {
                                                             Delivery Location
                                                         </p>
 
-                                                        <p className="font-medium">
-                                                            {order.address},{" "}
-                                                            {order.city}
+                                                        <p className="font-medium text-zinc-800 mt-1 break-words">
+                                                            {order.address}, {order.city}
                                                         </p>
                                                     </div>
-
                                                 </div>
 
-                                                <div className="mt-5 pt-4 border-t border-zinc-100 text-sm text-zinc-500">
-                                                    Order #{shortId}
-                                                </div>
+                                                <div className="mt-5 pt-4 border-t border-zinc-100 flex items-center justify-between gap-3">
+                                                    <span className="text-sm text-zinc-500">
+                                                        Order #{shortId}
+                                                    </span>
 
-                                            </div>
-                                        )
+                                                    <span className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 group-hover:gap-2 transition-all">
+                                                        View Details
+                                                        <span aria-hidden="true">→</span>
+                                                    </span>
+                                                </div>
+                                            </Link>
+                                        );
                                     })}
 
                                 </div>

@@ -6,6 +6,7 @@ import { connectDB } from "@/app/utility/db";
 import { sessionModel } from "@/app/utility/Model/session.model";
 import { randomUUID } from "node:crypto";
 import { sendOrderStatusWebhook } from "@/app/utility/sendwebhook";
+import { publishOrderStatus } from "@/app/utility/publishOrderStatus";
 
 connectDB();
 
@@ -125,6 +126,24 @@ export const PATCH = async (request: Request, { params }: Props) => {
             );
         }
 
+
+        if (
+            order.paymentMethod === "Razorpay" &&
+            order.paymentStatus !== "Paid"
+        ) {
+            return NextResponse.json(
+                {
+                    message:
+                        order.paymentStatus === "Failed"
+                            ? "Payment has failed. This order cannot proceed to delivery."
+                            : "Payment has not been confirmed. This order cannot proceed to delivery.",
+                    status: false,
+                },
+                { status: 409 }
+            );
+        }
+
+
         if (
             order.status === "Pending" &&
             status !== "Picked Up"
@@ -200,12 +219,29 @@ export const PATCH = async (request: Request, { params }: Props) => {
             };
         }
 
+        let websocketResult;
+
+        try {
+            websocketResult = await publishOrderStatus(event);
+        } catch (error) {
+            console.error(
+                "WebSocket event publishing failed:",
+                error
+            );
+
+            websocketResult = {
+                success: false,
+                message: "Order updated, but WebSocket publishing failed",
+            };
+        }
+
         return NextResponse.json(
             {
                 message: "Updated successfully",
                 status: true,
                 data: order,
                 webhook: webhookResult,
+                websocket: websocketResult,
             },
             { status: 200 }
         );

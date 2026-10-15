@@ -1,288 +1,283 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import toast from "react-hot-toast";
+import { fetchWithAuth } from "../helper/fetchWithAuth";
 
-const PaymentPage = () => {
+declare global {
+    interface Window {
+        Razorpay: new (options: RazorpayOptions) => {
+            open: () => void;
+            on: (
+                event: string,
+                callback: (response: {
+                    error?: {
+                        description?: string;
+                    };
+                }) => void
+            ) => void;
+        };
+    }
+}
+
+type RazorpayOptions = {
+    key: string;
+    amount: number;
+    currency: string;
+    name: string;
+    description: string;
+    order_id: string;
+    prefill: {
+        name: string;
+        email: string;
+        contact: string;
+    };
+    theme: {
+        color: string;
+    };
+    handler: (response: {
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+    }) => void;
+    modal?: {
+        ondismiss?: () => void;
+    };
+};
+
+type PendingOrder = {
+    orderId: string;
+    razorpayOrderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+    fullName: string;
+    email: string;
+    contactNumber: string;
+};
+
+export default function PaymentPage() {
     const router = useRouter();
 
+    const [pendingOrder, setPendingOrder] =
+        useState<PendingOrder | null>(null);
+
     const [loading, setLoading] = useState(false);
-
-    const [paymentType, setPaymentType] =
-        useState<"UPI" | "CARD">("UPI");
-
-    const [upiId, setUpiId] = useState("");
-
-    const [cardNumber, setCardNumber] = useState("");
-    const [expiry, setExpiry] = useState("");
-    const [cvv, setCvv] = useState("");
-
-
-    const [pendingOrder, setPendingOrder] = useState<string | null>(null);
-    const [totalAmount, setTotalAmount] = useState<number>(0);
+    const [scriptReady, setScriptReady] = useState(false);
 
     useEffect(() => {
         const savedOrder = localStorage.getItem("pendingOrder");
 
         if (!savedOrder) {
-            toast.error("Order data not found. Please checkout again.");
+            toast.error("Payment details not found. Please checkout again.");
             router.replace("/checkout");
             return;
         }
 
         try {
-            const orderData = JSON.parse(savedOrder);
+            const parsed: PendingOrder = JSON.parse(savedOrder);
 
-            if (typeof orderData.amount !== "number" || !Number.isFinite(orderData.amount)) {
-                toast.error("Invalid order amount. Please checkout again.");
-                router.replace("/checkout");
-                return;
+            if (
+                !parsed.orderId ||
+                !parsed.razorpayOrderId ||
+                !parsed.keyId ||
+                !Number.isFinite(parsed.amount) ||
+                parsed.amount <= 0
+            ) {
+                throw new Error("Invalid pending order");
             }
 
-            setPendingOrder(savedOrder);
-            setTotalAmount(orderData.amount);
-        } catch (error) {
-            console.error("Invalid pending order:", error);
-            toast.error("Invalid order data. Please checkout again.");
+            setPendingOrder(parsed);
+        } catch {
+            toast.error("Invalid payment details. Please checkout again.");
             router.replace("/checkout");
         }
     }, [router]);
 
     const handlePayment = async () => {
-        if (paymentType === "UPI" && !upiId.trim()) {
-            toast.error("Please enter UPI ID");
+        if (loading) return;
+
+        if (!pendingOrder) {
+            toast.error("Payment details not found. Please checkout again.");
             return;
         }
 
-        if (paymentType === "CARD") {
-            if (!cardNumber || !expiry || !cvv) {
-                toast.error("Please fill all card details");
-                return;
-            }
+        if (!scriptReady || !window.Razorpay) {
+            toast.error("Payment gateway is still loading. Please try again.");
+            return;
         }
 
         setLoading(true);
 
         try {
-
-            if (!pendingOrder) {
-                toast.error("Order data not found. Please checkout again.");
-                return;
-            }
-
-            let orderData;
-
-            try {
-                orderData = JSON.parse(pendingOrder);
-            } catch {
-                toast.error("Invalid order data. Please checkout again.");
-                return;
-            }
-
-            const res = await fetch("/api/webhook/payment", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
+            const options: RazorpayOptions = {
+                key: pendingOrder.keyId,
+                amount: pendingOrder.amount,
+                currency: pendingOrder.currency || "INR",
+                name: "RestaurantHub",
+                description: "Food order payment",
+                order_id: pendingOrder.razorpayOrderId,
+                prefill: {
+                    name: pendingOrder.fullName || "",
+                    email: pendingOrder.email || "",
+                    contact: pendingOrder.contactNumber || "",
                 },
-                body: JSON.stringify({
-                    paymentId: crypto.randomUUID(),
-                    paymentStatus: "Paid",
-                    orderData
-                })
-            })
+                theme: {
+                    color: "#f97316",
+                },
 
-            const data = await res.json();
+                handler: async (paymentResponse) => {
+                    try {
+                        const response = await fetchWithAuth(
+                            "/api/payment/razorpay/verify",
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    orderId: pendingOrder.orderId,
+                                    razorpay_order_id:
+                                        paymentResponse.razorpay_order_id,
+                                    razorpay_payment_id:
+                                        paymentResponse.razorpay_payment_id,
+                                    razorpay_signature:
+                                        paymentResponse.razorpay_signature,
+                                }),
+                            }
+                        );
 
-            if (!res.ok) {
-                toast.error(data.message || "Payment failed");
-                return;
-            }
+                        const result = await response.json();
 
-            localStorage.removeItem("cart");
-            localStorage.removeItem("pendingOrder");
+                        if (!response.ok || result.status === false) {
+                            toast.error(
+                                result.message ||
+                                "Payment verification failed. Please contact support if money was deducted."
+                            );
+                            return;
+                        }
 
-            toast.success("Payment successful");
-            router.push(`/payment/success/${data.data._id}`);
+                        localStorage.removeItem("cart");
+                        localStorage.removeItem("pendingOrder");
 
+                        toast.success("Payment successful!");
+
+                        router.replace(
+                            `/payment/success/${pendingOrder.orderId}`
+                        );
+                    } catch (error) {
+                        console.error("Payment verification error:", error);
+                        toast.error(
+                            "Could not verify payment. Please check your order before trying again."
+                        );
+                    } finally {
+                        setLoading(false);
+                    }
+                },
+
+                modal: {
+                    ondismiss: () => {
+                        setLoading(false);
+                    },
+                },
+            };
+
+            const razorpay = new window.Razorpay(options);
+
+            razorpay.on("payment.failed", (response) => {
+                setLoading(false);
+                toast.error(
+                    response.error?.description || "Payment failed. Please try again."
+                );
+            });
+
+            razorpay.open();
         } catch (error) {
-            console.log(error);
-            toast.error("Something went wrong");
-        } finally {
+            console.error("Unable to open Razorpay:", error);
             setLoading(false);
+            toast.error("Unable to open the payment gateway.");
         }
     };
 
     return (
         <div className="min-h-screen bg-zinc-100 flex items-center justify-center px-4 py-10">
+            <Script
+                src="https://checkout.razorpay.com/v1/checkout.js"
+                strategy="afterInteractive"
+                onReady={() => setScriptReady(true)}
+                onError={() => {
+                    setScriptReady(false);
+                    toast.error("Could not load the payment gateway.");
+                }}
+            />
 
             <div className="w-full max-w-lg bg-white rounded-3xl shadow-lg border border-zinc-200 p-8">
-
-                <h1 className="text-4xl font-bold text-zinc-900">
+                <h1 className="text-3xl sm:text-4xl font-bold text-zinc-900">
                     Secure Payment
                 </h1>
 
                 <p className="text-zinc-500 mt-2">
-                    Complete your payment to place the order.
+                    Complete your payment securely with Razorpay.
                 </p>
 
-                {/* Amount */}
-
                 <div className="mt-8 p-5 rounded-2xl border border-orange-200 bg-orange-50">
-
-                    <p className="text-zinc-500 text-sm">
-                        Amount To Pay
-                    </p>
+                    <p className="text-zinc-500 text-sm">Amount To Pay</p>
 
                     <h2 className="text-4xl font-bold text-orange-500 mt-1">
-                        ₹{totalAmount}
+                        ₹
+                        {pendingOrder
+                            ? (pendingOrder.amount / 100).toLocaleString(
+                                "en-IN",
+                                {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                }
+                            )
+                            : "—"}
                     </h2>
-
                 </div>
 
-                {/* Payment Method */}
-
-                <div className="mt-8">
-                    <h3 className="text-xl font-semibold text-zinc-900 mb-4">
-                        Payment Method
-                    </h3>
-
-                    <div className="space-y-4">
-
-                        {/* UPI */}
-
-                        <label
-                            onClick={() => setPaymentType("UPI")}
-                            className={`block rounded-2xl border cursor-pointer transition ${paymentType === "UPI"
-                                ? "border-orange-500 bg-orange-50"
-                                : "border-zinc-200 bg-white"
-                                }`}
-                        >
-                            <div className="flex items-center gap-4 p-5">
-
-                                <div
-                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentType === "UPI"
-                                        ? "border-orange-500"
-                                        : "border-zinc-300"
-                                        }`}
-                                >
-                                    {paymentType === "UPI" && (
-                                        <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                                    )}
-                                </div>
-
-                                <div>
-                                    <h4 className="font-semibold text-lg">
-                                        UPI Payment
-                                    </h4>
-
-                                    <p className="text-zinc-500 text-sm">
-                                        Google Pay, PhonePe, Paytm, BHIM
-                                    </p>
-                                </div>
-
-                            </div>
-                        </label>
-
-                        {paymentType === "UPI" && (
-                            <input
-                                type="text"
-                                placeholder="example@paytm"
-                                value={upiId}
-                                onChange={(e) => setUpiId(e.target.value)}
-                                className="w-full border border-zinc-300 rounded-2xl px-4 py-4 outline-none focus:border-orange-500"
-                            />
-                        )}
-
-                        {/* Card */}
-
-                        <label
-                            onClick={() => setPaymentType("CARD")}
-                            className={`block rounded-2xl border cursor-pointer transition ${paymentType === "CARD"
-                                ? "border-orange-500 bg-orange-50"
-                                : "border-zinc-200 bg-white"
-                                }`}
-                        >
-                            <div className="flex items-center gap-4 p-5">
-
-                                <div
-                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentType === "CARD"
-                                        ? "border-orange-500"
-                                        : "border-zinc-300"
-                                        }`}
-                                >
-                                    {paymentType === "CARD" && (
-                                        <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                                    )}
-                                </div>
-
-                                <div>
-                                    <h4 className="font-semibold text-lg">
-                                        Credit / Debit Card
-                                    </h4>
-
-                                    <p className="text-zinc-500 text-sm">
-                                        Visa, Mastercard, RuPay
-                                    </p>
-                                </div>
-
-                            </div>
-                        </label>
-
-                        {paymentType === "CARD" && (
-                            <div className="space-y-4">
-
-                                <input
-                                    type="text"
-                                    placeholder="1234 5678 9012 3456"
-                                    value={cardNumber}
-                                    onChange={(e) => setCardNumber(e.target.value)}
-                                    className="w-full border border-zinc-300 rounded-2xl px-4 py-4 outline-none focus:border-orange-500"
-                                />
-
-                                <div className="grid grid-cols-2 gap-4">
-
-                                    <input
-                                        type="text"
-                                        placeholder="MM/YY"
-                                        value={expiry}
-                                        onChange={(e) => setExpiry(e.target.value)}
-                                        className="border border-zinc-300 rounded-2xl px-4 py-4 outline-none focus:border-orange-500"
-                                    />
-
-                                    <input
-                                        type="password"
-                                        placeholder="CVV"
-                                        value={cvv}
-                                        onChange={(e) => setCvv(e.target.value)}
-                                        className="border border-zinc-300 rounded-2xl px-4 py-4 outline-none focus:border-orange-500"
-                                    />
-
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                <div className="mt-6 rounded-2xl bg-zinc-50 border border-zinc-200 p-5">
+                    <p className="font-semibold text-zinc-900">
+                        Pay using Razorpay
+                    </p>
+                    <p className="text-sm text-zinc-500 mt-2">
+                        Choose an available payment method in the secure Razorpay
+                        popup, such as UPI, cards or net banking.
+                    </p>
                 </div>
-
 
                 <button
                     onClick={handlePayment}
-                    disabled={loading}
-                    className="w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-semibold text-lg transition disabled:opacity-60"
+                    disabled={loading || !pendingOrder || !scriptReady}
+                    className="w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-semibold text-lg transition disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                 >
                     {loading
-                        ? "Processing Payment..."
-                        : `Pay ₹${totalAmount}`}
+                        ? "Processing..."
+                        : !scriptReady
+                            ? "Loading Payment Gateway..."
+                            : `Pay ₹${pendingOrder
+                                ? (pendingOrder.amount / 100).toFixed(2)
+                                : "—"
+                            }`}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => router.push("/order")}
+                    disabled={loading}
+                    className="w-full mt-3 border border-zinc-200 text-zinc-700 py-3 rounded-2xl font-medium hover:bg-zinc-50 transition disabled:opacity-60"
+                >
+                    Back to Checkout
                 </button>
 
                 <p className="text-center text-zinc-400 text-sm mt-5">
-                    🔒 Demo Payment Gateway (Webhook Learning)
+                    Secure payment · Razorpay Test Mode
                 </p>
-
             </div>
-
         </div>
     );
-};
-
-export default PaymentPage;
+}

@@ -4,6 +4,8 @@ import { RestaurantModel } from "@/app/utility/Model/RestaurantsModel";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken"
+import { FoodItemsModel } from "@/app/utility/Model/FoodItemsModel";
+import { DeliveryPartnerModel } from "@/app/utility/Model/DeliveryPartnerModel";
 
 connectDB();
 

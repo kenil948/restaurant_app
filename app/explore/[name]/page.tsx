@@ -2,8 +2,9 @@
 
 import CustomerHeader from "@/app/_components/CustomerHeader";
 import RestaurantFooter from "@/app/_components/RestaurantFooter";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { FiArrowLeft } from "react-icons/fi";
 
 type RestaurantType = {
     _id: string;
@@ -28,9 +29,10 @@ const RestaurantDetails = () => {
     const [foodItems, setFoodItems] = useState<FoodItemType[]>([]);
     const [loading, setLoading] = useState(true);
     const [cartData, setCartData] = useState<FoodItemType>();
-    const [cartStorage, setCartStorage] = useState(JSON.parse(localStorage.getItem("cart") || "[]"));
-    const [cartIds, setCartIds] = useState<string[]>(cartStorage ? cartStorage.map((item: FoodItemType) => item._id) : []);
+    const [cartStorage, setCartStorage] = useState<FoodItemType[]>([]);
+    const [cartIds, setCartIds] = useState<string[]>([]);
     const [removeCartData, setRemoveCartData] = useState<string>();
+    const router = useRouter()
 
     const searchParams = useSearchParams();
 
@@ -68,6 +70,16 @@ const RestaurantDetails = () => {
     }
 
     useEffect(() => {
+        const storedCart = localStorage.getItem("cart");
+        const cart: FoodItemType[] = storedCart
+            ? JSON.parse(storedCart)
+            : [];
+
+        setCartStorage(cart);
+        setCartIds(cart.map((item) => item._id));
+    }, []);
+
+    useEffect(() => {
         const fetchData = async () => {
             await handleRestaurantDetail();
         };
@@ -102,7 +114,14 @@ const RestaurantDetails = () => {
                 }}
             >
                 <div className="absolute inset-0 bg-black/70"></div>
-
+                <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="absolute top-6 left-6 md:top-8 md:left-10 z-20 inline-flex items-center gap-2 px-3.5 py-2 bg-white/95 text-orange-600 hover:bg-orange-50 border border-white/70 rounded-xl font-medium shadow-md transition-all duration-200 cursor-pointer"
+                >
+                    <FiArrowLeft className="w-4 h-4" />
+                    Back
+                </button>
                 <div className="relative z-10 text-center px-4">
                     <h1 className="text-5xl md:text-7xl font-bold text-white">
                         {restaurant?.restaurantName}

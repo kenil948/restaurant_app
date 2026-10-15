@@ -158,11 +158,7 @@ const AddFoodItem = ({ setAddItem }: { setAddItem: React.Dispatch<React.SetState
                 <button
                     type="submit"
                     disabled={loading}
-                    className={`w-full py-3 rounded-xl font-semibold transition-all
-    ${loading
-                            ? "bg-orange-300 cursor-not-allowed text-white"
-                            : "bg-orange-500 hover:bg-orange-600 text-white cursor-pointer"
-                        }`}
+                    className={"w-full py-3 rounded-xl font-semibold transition-all bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"}
                 >
                     {loading ? "Adding Food..." : "Add Food Item"}
                 </button>

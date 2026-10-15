@@ -235,11 +235,7 @@ const CustomerSignUp = ({ redirect }: { redirect?: string | null }) => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-orange-300 cursor-pointer 
-                                ${loading
-                                    ? "bg-orange-300 cursor-not-allowed"
-                                    : "bg-orange-500 hover:bg-orange-600 cursor-pointer"
-                                }`}
+                            className={"w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-orange-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"}
                         >
                             {loading ? "Creating..." : "Create Account"}
                         </button>

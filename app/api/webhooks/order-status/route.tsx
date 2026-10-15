@@ -1,9 +1,7 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { connectDB } from "@/app/utility/db";
-import { WebhookEventModel } from "@/app/utility/Model/WebhookEventModel";
-
-connectDB();
+import { WebhookEventModel } from "@/app/utility/Model/WebhookEventModel"; 
 
 export const runtime = "nodejs";
 const MAX_AGE_SECONDS = 300;

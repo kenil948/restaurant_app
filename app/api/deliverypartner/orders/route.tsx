@@ -50,9 +50,18 @@ export const GET = async (request: Request) => {
                 }
             );
         }
+
         const orders = await OrderModel.find({
-            deliveryBoyId: decoded.id
+            deliveryBoyId: decoded.id,
+            $or: [
+                { paymentMethod: "COD" },
+                {
+                    paymentMethod: "Razorpay",
+                    paymentStatus: "Paid",
+                },
+            ],
         }).sort({ createdAt: -1 });
+
 
         return NextResponse.json(
             {

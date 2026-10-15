@@ -18,6 +18,8 @@ type FoodItemsTypes = {
 const FoodItemList = () => {
 
     const [foodItems, setFoodItems] = useState<FoodItemsTypes[]>([]);
+    const [deletingFoodId, setDeletingFoodId] = useState<string | null>(null);
+    const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
     const router = useRouter();
 
     const getFoodItems = async () => {
@@ -35,21 +37,29 @@ const FoodItemList = () => {
         }
     };
 
-
     const deleteFoodItem = async (id: string) => {
-        const response = await fetchWithAuth(`/api/restaurant/foods/${id}`, {
-            method: "DELETE"
-        });
+        try {
+            const response = await fetchWithAuth(
+                `/api/restaurant/foods/${id}`,
+                {
+                    method: "DELETE",
+                }
+            );
 
-        const data = await response.json();
+            const data = await response.json();
 
-        if (response.ok) {
-            getFoodItems();
+            if (!response.ok) {
+                toast.error(data.message || "Food item not deleted");
+                return;
+            }
+
             toast.success(data.message || "Food item deleted");
-        } else {
-            toast.error(data.message || "Food item not deleted");
+            await getFoodItems();
+        } catch (error) {
+            console.error("Delete food item error:", error);
+            toast.error("Something went wrong. Please try again.");
         }
-    }
+    };
 
     useEffect(() => {
         const fetchFoodItems = async () => {
@@ -121,21 +131,52 @@ const FoodItemList = () => {
                                     <td className="px-6 py-5">
                                         <div className="flex items-center justify-center gap-3">
                                             <button
+                                                type="button"
+                                                disabled={editingFoodId !== null || deletingFoodId !== null}
                                                 onClick={() => {
-                                                    router.push(`/restaurant/dashboard/${item._id}`)
+                                                    if (editingFoodId || deletingFoodId) return;
+
+                                                    setEditingFoodId(item._id);
+                                                    router.push(`/restaurant/dashboard/${item._id}`);
                                                 }}
-                                                className="w-24 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                                                className="w-24 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                                             >
-                                                <FiEdit />
-                                                Edit
+                                                {editingFoodId === item._id ? (
+                                                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                                ) : (
+                                                    <>
+                                                        <FiEdit />
+                                                        Edit
+                                                    </>
+                                                )}
                                             </button>
 
                                             <button
-                                                onClick={() => deleteFoodItem(item._id)}
-                                                className="w-24 h-12 bg-red-500 hover:bg-red-600 text-white rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                                                type="button"
+                                                disabled={deletingFoodId !== null || editingFoodId !== null}
+                                                onClick={async () => {
+                                                    if (deletingFoodId || editingFoodId) return;
+
+                                                    if (confirm("Are you sure you want to delete this food item?")) {
+                                                        setDeletingFoodId(item._id);
+
+                                                        try {
+                                                            await deleteFoodItem(item._id);
+                                                        } finally {
+                                                            setDeletingFoodId(null);
+                                                        }
+                                                    }
+                                                }}
+                                                className="w-24 h-12 bg-red-500 hover:bg-red-600 text-white rounded-xl transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-red-500"
                                             >
-                                                <FiTrash2 />
-                                                Delete
+                                                {deletingFoodId === item._id ? (
+                                                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                                ) : (
+                                                    <>
+                                                        <FiTrash2 />
+                                                        Delete
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
                                     </td>

@@ -111,11 +111,7 @@ const RestaurantLogin = ({
         <button
           type="submit"
           disabled={loading}
-          className={`w-full py-3 rounded-xl text-white font-semibold transition
-    ${loading
-              ? "bg-orange-300 cursor-not-allowed"
-              : "bg-orange-500 hover:bg-orange-600 cursor-pointer"
-            }`}
+          className={"w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"}
         >
           {loading ? "Logging in..." : "Login"}
         </button>

@@ -33,6 +33,7 @@ type DeliveryPartner = {
 const AvailableOrders = () => {
     const [orders, setOrders] = useState<OrderType[]>([]);
     const [loading, setLoading] = useState(true);
+    const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
     const [deliveryBoy, setDeliveryBoy] = useState<DeliveryPartner | null>(null);
 
     const router = useRouter();
@@ -85,6 +86,11 @@ const AvailableOrders = () => {
         orderId: string,
         status: string
     ) => {
+
+        if (updatingOrderId) return;
+
+        setUpdatingOrderId(orderId);
+
         try {
             const response = await fetchWithAuth(
                 `/api/order/status/${orderId}`,
@@ -97,15 +103,21 @@ const AvailableOrders = () => {
                 }
             );
 
-            if (response.ok) {
+
+            const data = await response.json().catch(() => null);
+
+            if (response.ok && data?.status) {
                 toast.success("Order status updated");
                 await getOrders();
             } else {
-                toast.error("Unable to update order");
+                toast.error(data?.message || "Unable to update order");
             }
+
         } catch (error) {
             console.log(error);
             toast.error("Something went wrong");
+        } finally {
+            setUpdatingOrderId(null);
         }
     };
 
@@ -283,6 +295,8 @@ const AvailableOrders = () => {
 
                                             {order.status === "Pending" && (
                                                 <button
+                                                    type="button"
+                                                    disabled={updatingOrderId !== null}
                                                     onClick={() => {
                                                         if (
                                                             confirm(
@@ -295,15 +309,19 @@ const AvailableOrders = () => {
                                                             );
                                                         }
                                                     }}
-                                                    className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold cursor-pointer"
+                                                    className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                                                 >
-                                                    Accept Order
+                                                    {updatingOrderId === order._id
+                                                        ? "Accepting Order..."
+                                                        : "Accept Order"}
                                                 </button>
                                             )}
 
                                             {order.status ===
                                                 "Picked Up" && (
                                                     <button
+                                                        type="button"
+                                                        disabled={updatingOrderId !== null}
                                                         onClick={() => {
                                                             if (
                                                                 confirm(
@@ -316,9 +334,11 @@ const AvailableOrders = () => {
                                                                 );
                                                             }
                                                         }}
-                                                        className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold cursor-pointer"
+                                                        className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                                                     >
-                                                        Mark Delivered
+                                                        {updatingOrderId === order._id
+                                                            ? "Updating..."
+                                                            : "Mark Delivered"}
                                                     </button>
                                                 )}
                                         </div>

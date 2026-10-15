@@ -40,7 +40,7 @@ const OrderSchema = new Schema({
         enum: ["COD", "Razorpay"],
         default: "COD"
     },
-    paymentStatus: {
+    paymentStatus: {                                                    
         type: String,
         enum: [
             "Pending",
@@ -53,6 +53,14 @@ const OrderSchema = new Schema({
     transactionId: {
         type: String,
         default: null
+    },
+    razorpayOrderId: {
+        type: String,
+        default: null,
+    },
+    razorpayPaymentId: {
+        type: String,
+        default: null,
     },
     address: {
         type: String,

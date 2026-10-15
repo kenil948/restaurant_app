@@ -6,6 +6,7 @@ import RestaurantFooter from "../_components/RestaurantFooter";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "../helper/fetchWithAuth";
+import { FiArrowLeft } from "react-icons/fi";
 
 type FoodItemType = {
     _id: string;
@@ -91,10 +92,7 @@ const CheckoutPage = () => {
             address,
             landmark,
             paymentMethod,
-            paymentStatus:
-                paymentMethod === "Razorpay"
-                    ? "Paid"
-                    : "Pending",
+            paymentStatus: "Pending",
         };
 
         const response = await fetchWithAuth("/api/order", {
@@ -114,12 +112,19 @@ const CheckoutPage = () => {
         if (loading) {
             return;
         }
-        setLoading(true);
+
         if (!city || !address) {
             toast.error("Please enter delivery details.");
             setLoading(false);
             return;
         }
+
+        if (cartStorage.length === 0) {
+            toast.error("Cart is empty");
+            return;
+        }
+
+        setLoading(true);
 
         try {
             if (
@@ -179,18 +184,46 @@ const CheckoutPage = () => {
                 return;
             }
             if (paymentMethod === "Razorpay") {
+                const response = await fetchWithAuth(
+                    "/api/payment/razorpay/order",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            foodItemsIds,
+                            restoId: cartStorage[0].restaurantId,
+                            deliveryBoyId,
+                            city,
+                            address,
+                            landmark,
+                        }),
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || result.status === false) {
+                    toast.error(
+                        result.message || "Failed to initialize payment"
+                    );
+                    return;
+                }
+
+                const paymentData = result.data ?? result;
+
                 localStorage.setItem(
                     "pendingOrder",
                     JSON.stringify({
-                        userId: user._id,
-                        foodItemsIds,
-                        restoId: cartStorage[0].restaurantId,
-                        deliveryBoyId,
-                        amount: totalAmount,
-                        city,
-                        address,
-                        landmark,
-                        paymentMethod,
+                        orderId: paymentData.orderId,
+                        razorpayOrderId: paymentData.razorpayOrderId,
+                        amount: paymentData.amount,
+                        currency: paymentData.currency,
+                        keyId: paymentData.keyId,
+                        fullName: user.fullName,
+                        email: user.email,
+                        contactNumber: user.contactNumber,
                     })
                 );
 
@@ -212,7 +245,18 @@ const CheckoutPage = () => {
             <section className="bg-white border-b border-zinc-200">
 
                 <div className="max-w-7xl mx-auto px-6 py-10">
-
+                    <button
+                        type="button"
+                        onClick={() => router.push("/cart")}
+                        className="inline-flex items-center gap-2 px-3.5 py-2
+        mb-4 bg-orange-50 text-orange-600
+        hover:bg-orange-100 border border-orange-100
+        rounded-xl text-sm font-medium
+        transition-colors cursor-pointer"
+                    >
+                        <FiArrowLeft className="w-4 h-4" />
+                        Back to Cart
+                    </button>
                     <h1 className="text-4xl font-bold text-zinc-900">
                         Checkout
                     </h1>
@@ -492,17 +536,18 @@ const CheckoutPage = () => {
                                     </div>
 
                                     <button
+                                        type="button"
                                         disabled={loading}
                                         onClick={
                                             handlePlaceOrder
                                         }
-                                        className={`w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-semibold text-lg transition-all duration-300 cursor-pointer
-                                            ${loading
-                                                ? "bg-orange-300 cursor-not-allowed"
-                                                : "bg-orange-500 hover:bg-orange-600 cursor-pointer"
-                                            }`}
+                                        className={"w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-semibold text-lg transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500"}
                                     >
-                                        {loading ? "Placing Order..." : "Place Order"}
+                                        {loading
+                                            ? paymentMethod === "COD"
+                                                ? "Placing Order..."
+                                                : "Preparing Payment..."
+                                            : "Place Order"}
                                     </button>
 
                                 </div>
